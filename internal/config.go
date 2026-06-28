@@ -1,3 +1,5 @@
+// Package acmon は ZMPT101B+MCP3208 電圧フロントエンドと USB サウンドカードの
+// スペクトル・フロントエンドから電力品質メトリクスを収集し、Prometheus 形式で公開する。
 package acmon
 
 import (
@@ -7,34 +9,30 @@ import (
 
 // Config は実行時設定。flag で上書きする。
 type Config struct {
-	Listen string
-
-	// ----- ZMPT101B + MCP3208 系統 -----
-	EnableZMPT bool
-	SPIPort    string // "" で先頭、または "/dev/spidev0.0"
-	SPIHz      int    // SPI クロック
-	ADCChannel int    // MCP3208 のチャンネル 0..7
-	ZmptRate   int    // 目標サンプルレート [SPS]
-	ZmptWindow time.Duration
-	ADCBits    int // MCP3208 = 12bit
-	// 校正: RMS カウント → 系統電圧[V] の係数。要実測校正（README 参照）。
+	Listen               string
+	AudioFormat          string
+	SPIPort              string
+	AudioDevice          string
+	SagVolts             float64
+	FFTSize              int
+	ZmptWindow           time.Duration
+	ADCBits              int
 	ZmptCalVoltsPerCount float64
 	NominalVolts         float64
-	SagVolts             float64 // この値を下回ったらサグ
-	SwellVolts           float64 // この値を上回ったらスウェル
-	EventHystV           float64 // 復帰ヒステリシス[V]
-
-	// ----- USB サウンドカード系統 -----
-	EnableSoundcard bool
-	AudioDevice     string // arecord -D に渡す（例 "hw:1,0" / "default"）
-	AudioRate       int
-	AudioFormat     string        // "S32_LE" | "S16_LE"
-	FFTSize         int           // 2 のべき乗推奨
-	TransientK      float64       // 期待ピークの何倍を過渡とみなすか
-	PstWindow       time.Duration // フリッカ評価窓
-	PstGain         float64       // 簡易 Pst のスケール係数（無次元、要現場調整）
+	ADCChannel           int
+	SwellVolts           float64
+	EventHystV           float64
+	PstGain              float64
+	SPIHz                int
+	AudioRate            int
+	PstWindow            time.Duration
+	ZmptRate             int
+	TransientK           float64
+	EnableZMPT           bool
+	EnableSoundcard      bool
 }
 
+// ParseFlags はコマンドライン引数を解釈し、確定した Config を返す。起動時に main から一度だけ呼ぶ。
 func ParseFlags() *Config {
 	c := &Config{}
 	flag.StringVar(&c.Listen, "listen", ":9100", "HTTP listen address for /metrics")
@@ -44,8 +42,15 @@ func ParseFlags() *Config {
 	flag.IntVar(&c.SPIHz, "spi-hz", 1_000_000, "SPI clock [Hz]")
 	flag.IntVar(&c.ADCChannel, "adc-channel", 0, "MCP3208 channel 0..7")
 	flag.IntVar(&c.ZmptRate, "zmpt-rate", 8000, "ZMPT target sample rate [SPS]")
+
 	windowMs := flag.Int("zmpt-window-ms", 200, "ZMPT analysis window [ms]")
-	flag.Float64Var(&c.ZmptCalVoltsPerCount, "zmpt-cal", 0.0, "calibration: line volts per RMS ADC count (must be set, see README)")
+
+	flag.Float64Var(
+		&c.ZmptCalVoltsPerCount,
+		"zmpt-cal",
+		0.0,
+		"calibration: line volts per RMS ADC count (must be set, see README)",
+	)
 	flag.Float64Var(&c.NominalVolts, "nominal-volts", 100.0, "nominal line voltage [V]")
 	flag.Float64Var(&c.SagVolts, "sag-volts", 95.0, "sag threshold [V]")
 	flag.Float64Var(&c.SwellVolts, "swell-volts", 107.0, "swell threshold [V]")
@@ -57,13 +62,17 @@ func ParseFlags() *Config {
 	flag.StringVar(&c.AudioFormat, "audio-format", "S32_LE", "audio format: S32_LE|S16_LE")
 	flag.IntVar(&c.FFTSize, "fft-size", 8192, "FFT size (power of two)")
 	flag.Float64Var(&c.TransientK, "transient-k", 1.6, "transient threshold as multiple of expected peak")
+
 	pstMs := flag.Int("pst-window-ms", 10000, "flicker (Pst) evaluation window [ms]")
+
 	flag.Float64Var(&c.PstGain, "pst-gain", 50.0, "scale factor for simplified flicker indicator")
 
+	//nolint:revive // deep-exit: ParseFlags は起動時に main から一度だけ呼ぶ設定集約関数であり flag.Parse をここで呼ぶのが妥当。
 	flag.Parse()
 
 	c.ZmptWindow = time.Duration(*windowMs) * time.Millisecond
 	c.PstWindow = time.Duration(*pstMs) * time.Millisecond
 	c.ADCBits = 12
+
 	return c
 }

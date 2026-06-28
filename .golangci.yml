@@ -1,10 +1,11 @@
-# golangci-lint v2 設定 — 最大限に厳格な構成
+# golangci-lint v2 設定 — 厳格だが慣用的(strict-but-idiomatic)な構成
 # 対象: golangci-lint 2.12.x / Go 1.25
 #
 # 方針:
-#   - linters.default: all で全リンターを有効化し、設定可能な閾値はすべて厳しい側へ。
+#   - linters.default: all で全リンターを有効化し、設定可能な閾値は基本すべて厳しい側へ。
 #   - 内部矛盾するチェック(gocritic unnamedResult ⇔ nonamedreturns 等)のみ解消。
-#   - 既存コードの指摘を黙らせるための緩和は行わない。指摘が多いのは「最大限厳格」の意図どおり。
+#   - 慣用的な Go を「悪化」させる少数のリンター(exhaustruct / gochecknoglobals /
+#     noinlineerr / varnamelen)のみ、根拠コメント付きで無効化する。それ以外は緩めない。
 #   - フォーマッタは推奨スタック gofumpt + gci + golines（goimports は gci と二重管理になるため不採用）。
 #
 # 実行:
@@ -26,6 +27,20 @@ linters:
     # 二重実行・警告になるため、旧版を明示的に無効化する。
     - wsl # → wsl_v5 を使用
     - gomodguard # → gomodguard_v2 を使用
+
+    # --- 慣用的な Go を悪化させるため意図的に無効化(strict-but-idiomatic) ---
+    # stdlib 構造体(http.Server / promhttp.HandlerOpts 等)の全フィールド明示を要求する。
+    # ゼロ値で十分なフィールドまで列挙させるため非現実的。
+    - exhaustruct
+    # prometheus.Desc をパッケージ変数として定義するのは公式例どおりの定石パターン。
+    - gochecknoglobals
+    # `if err := f(); err != nil` という Go 標準の慣用形を一律禁止してしまう。
+    - noinlineerr
+    # i / n / k / v / dc / f0 等、短いスコープでの慣用的短名まで過剰に検出する。
+    - varnamelen
+    # 日本語のユーザ向けメッセージ(ログ等)を意図的に使うため、Han スクリプトの
+    # 文字列リテラルを一律に問題視する gosmopolitan は本プロジェクトに不適合。
+    - gosmopolitan
 
   settings:
     errcheck:
@@ -91,7 +106,22 @@ linters:
     goconst:
       min-len: 2
       min-occurrences: 2
-      numbers: true
+      # 数値リテラル(0.0 等)は mnd の領分なので goconst では検出しない。
+      numbers: false
+
+    mnd:
+      # flag のデフォルト値は flag 名と usage 文字列で自明なので除外する。
+      ignored-functions:
+        - '^flag\.'
+      # 単位換算・自明な算術係数は定数化しても可読性が上がらないため除外。
+      # ドメイン上意味のある値(ADC プロトコル・周波数帯・しきい値等)はコード側で定数化する。
+      ignored-numbers:
+        - "2"
+        - "4"
+        - "0.5"
+        - "1000"
+        - "1000.0"
+        - "1e9"
 
     misspell:
       locale: US
@@ -152,6 +182,8 @@ linters:
         - name: cyclomatic # ↔ cyclop / gocyclo
           disabled: true
         - name: cognitive-complexity # ↔ gocognit
+          disabled: true
+        - name: confusing-results # ↔ nonamedreturns（同型の戻り値に命名を促すが nonamedreturns と矛盾）
           disabled: true
         - name: line-length-limit # ↔ lll / golines
           disabled: true
