@@ -1,4 +1,4 @@
-package main
+package acmon
 
 import (
 	"flag"
@@ -10,32 +10,32 @@ type Config struct {
 	Listen string
 
 	// ----- ZMPT101B + MCP3208 系統 -----
-	EnableZMPT  bool
-	SPIPort     string  // "" で先頭、または "/dev/spidev0.0"
-	SPIHz       int     // SPI クロック
-	ADCChannel  int     // MCP3208 のチャンネル 0..7
-	ZmptRate    int     // 目標サンプルレート [SPS]
-	ZmptWindow  time.Duration
-	ADCBits     int     // MCP3208 = 12bit
+	EnableZMPT bool
+	SPIPort    string // "" で先頭、または "/dev/spidev0.0"
+	SPIHz      int    // SPI クロック
+	ADCChannel int    // MCP3208 のチャンネル 0..7
+	ZmptRate   int    // 目標サンプルレート [SPS]
+	ZmptWindow time.Duration
+	ADCBits    int // MCP3208 = 12bit
 	// 校正: RMS カウント → 系統電圧[V] の係数。要実測校正（README 参照）。
 	ZmptCalVoltsPerCount float64
-	NominalVolts float64
-	SagVolts     float64 // この値を下回ったらサグ
-	SwellVolts   float64 // この値を上回ったらスウェル
-	EventHystV   float64 // 復帰ヒステリシス[V]
+	NominalVolts         float64
+	SagVolts             float64 // この値を下回ったらサグ
+	SwellVolts           float64 // この値を上回ったらスウェル
+	EventHystV           float64 // 復帰ヒステリシス[V]
 
 	// ----- USB サウンドカード系統 -----
 	EnableSoundcard bool
 	AudioDevice     string // arecord -D に渡す（例 "hw:1,0" / "default"）
 	AudioRate       int
-	AudioFormat     string // "S32_LE" | "S16_LE"
-	FFTSize         int    // 2 のべき乗推奨
-	TransientK      float64 // 期待ピークの何倍を過渡とみなすか
+	AudioFormat     string        // "S32_LE" | "S16_LE"
+	FFTSize         int           // 2 のべき乗推奨
+	TransientK      float64       // 期待ピークの何倍を過渡とみなすか
 	PstWindow       time.Duration // フリッカ評価窓
-	PstGain         float64 // 簡易 Pst のスケール係数（無次元、要現場調整）
+	PstGain         float64       // 簡易 Pst のスケール係数（無次元、要現場調整）
 }
 
-func parseFlags() *Config {
+func ParseFlags() *Config {
 	c := &Config{}
 	flag.StringVar(&c.Listen, "listen", ":9100", "HTTP listen address for /metrics")
 

@@ -1,4 +1,4 @@
-package main
+package acmon
 
 import (
 	"context"
@@ -14,8 +14,8 @@ import (
 // ZmptSampler は MCP3208 を SPI で連続サンプリングし、窓ごとに
 // RMS / 周波数 / クレストファクタ / サグ・スウェルを算出する。
 type ZmptSampler struct {
-	cfg  *Config
-	out  *atomic.Pointer[ZmptSnapshot]
+	cfg *Config
+	out *atomic.Pointer[ZmptSnapshot]
 
 	// 累積カウンタ（このゴルーチンのみが書く）
 	sagTotal   uint64

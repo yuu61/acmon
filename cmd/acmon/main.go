@@ -13,10 +13,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"periph.io/x/host/v3"
+
+	"acmon/internal"
 )
 
 func main() {
-	cfg := parseFlags()
+	cfg := acmon.ParseFlags()
 	log.SetFlags(log.LstdFlags | log.Lmsgprefix)
 	log.SetPrefix("acmon: ")
 
@@ -24,14 +26,14 @@ func main() {
 		log.Printf("WARNING: -zmpt-cal が未設定です。voltage_rms は 0 になり、サグ/スウェル判定も無効です（README の校正手順を参照）")
 	}
 
-	var zmptPtr atomic.Pointer[ZmptSnapshot]
-	var scPtr atomic.Pointer[SoundcardSnapshot]
+	var zmptPtr atomic.Pointer[acmon.ZmptSnapshot]
+	var scPtr atomic.Pointer[acmon.SoundcardSnapshot]
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
 	reg := prometheus.NewRegistry()
-	reg.MustRegister(NewCollector(&zmptPtr, &scPtr))
+	reg.MustRegister(acmon.NewCollector(&zmptPtr, &scPtr))
 	// 標準の process/go コレクタも付けておく
 	reg.MustRegister(prometheus.NewGoCollector())
 
@@ -39,7 +41,7 @@ func main() {
 		if _, err := host.Init(); err != nil {
 			log.Fatalf("periph host init failed: %v", err)
 		}
-		z := NewZmptSampler(cfg, &zmptPtr)
+		z := acmon.NewZmptSampler(cfg, &zmptPtr)
 		go func() {
 			if err := z.Run(ctx); err != nil && ctx.Err() == nil {
 				log.Fatalf("zmpt sampler stopped: %v", err)
@@ -48,7 +50,7 @@ func main() {
 	}
 
 	if cfg.EnableSoundcard {
-		s := NewSoundcardSampler(cfg, &scPtr)
+		s := acmon.NewSoundcardSampler(cfg, &scPtr)
 		go func() {
 			if err := s.Run(ctx); err != nil && ctx.Err() == nil {
 				log.Printf("soundcard sampler stopped: %v", err)

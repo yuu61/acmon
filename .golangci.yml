@@ -1,0 +1,203 @@
+# golangci-lint v2 設定 — 最大限に厳格な構成
+# 対象: golangci-lint 2.12.x / Go 1.25
+#
+# 方針:
+#   - linters.default: all で全リンターを有効化し、設定可能な閾値はすべて厳しい側へ。
+#   - 内部矛盾するチェック(gocritic unnamedResult ⇔ nonamedreturns 等)のみ解消。
+#   - 既存コードの指摘を黙らせるための緩和は行わない。指摘が多いのは「最大限厳格」の意図どおり。
+#   - フォーマッタは推奨スタック gofumpt + gci + golines（goimports は gci と二重管理になるため不採用）。
+#
+# 実行:
+#   golangci-lint run ./...     # 静的解析
+#   golangci-lint fmt ./...     # フォーマッタ適用(gofumpt/gci/golines)
+version: "2"
+
+run:
+  # テストコードも解析対象に含める。
+  tests: true
+  # go.mod / go.sum を書き換えずに解析する(CI で差分を検出しやすい)。
+  modules-download-mode: readonly
+
+linters:
+  # すべてのリンターを有効化。
+  default: all
+  disable:
+    # default: all は非推奨リンターも有効化し、置換版(wsl_v5 / gomodguard_v2)と
+    # 二重実行・警告になるため、旧版を明示的に無効化する。
+    - wsl # → wsl_v5 を使用
+    - gomodguard # → gomodguard_v2 を使用
+
+  settings:
+    errcheck:
+      # 型アサーション `x.(T)` の ok 無視を検出。
+      check-type-assertions: true
+      # `_ = f()` のようなブランク代入によるエラー破棄も検出。
+      check-blank: true
+
+    govet:
+      # fieldalignment / shadow を含む全アナライザを有効化。
+      enable-all: true
+
+    gocritic:
+      # 既定で無効な opinionated チェックも含めて全部有効化。
+      enable-all: true
+      disabled-checks:
+        # 戻り値の命名を促すが nonamedreturns と矛盾するため無効化。
+        - unnamedResult
+      settings:
+        captLocal:
+          paramsOnly: false
+        underef:
+          skipRecvDeref: false
+        rangeValCopy:
+          sizeThreshold: 128
+        hugeParam:
+          sizeThreshold: 128
+
+    # 循環的複雑度(関数/パッケージ平均)。既定 30 → 10 へ。
+    cyclop:
+      max-complexity: 10
+      package-average: 8.0
+
+    gocyclo:
+      min-complexity: 10
+
+    # 認知的複雑度。既定 30 → 10 へ。
+    gocognit:
+      min-complexity: 10
+
+    # ネストした if。既定 5 → 4 へ。
+    nestif:
+      min-complexity: 4
+
+    funlen:
+      lines: 60
+      statements: 40
+      ignore-comments: true
+
+    # 保守性指数。既定 20。値が高いほど多く検出。
+    maintidx:
+      under: 20
+
+    lll:
+      # golines.max-len と一致させる。
+      line-length: 120
+      tab-width: 4
+
+    # 重複コード検出。既定 150 → 100 トークンへ。
+    dupl:
+      threshold: 100
+
+    goconst:
+      min-len: 2
+      min-occurrences: 2
+      numbers: true
+
+    misspell:
+      locale: US
+
+    # naked return を実質禁止(短い関数でも検出)。nonamedreturns と併用。
+    nakedret:
+      max-func-lines: 1
+
+    varnamelen:
+      min-name-length: 3
+      check-receiver: true
+      check-return: true
+      check-type-param: true
+
+    nolintlint:
+      # //nolint には必ず理由コメントを要求。
+      require-explanation: true
+      # //nolint:all のような曖昧指定を禁止し、リンター名を必須に。
+      require-specific: true
+      # 実際には不要な //nolint を検出。
+      allow-unused: false
+
+    exhaustive:
+      default-signifies-exhaustive: true
+      check:
+        - switch
+        - map
+
+    errchkjson:
+      check-error-free-encoding: true
+      report-no-exported: true
+
+    # exhaustruct は include パターンが無いと何も検査しない(no-op)。
+    # 自分の型に限定して有効化する場合は以下のように記述する:
+    # exhaustruct:
+    #   include:
+    #     - 'acmon\..*Config'
+
+    depguard:
+      rules:
+        deprecated:
+          deny:
+            - pkg: io/ioutil
+              desc: io/ioutil は Go 1.16 で非推奨。io / os を使うこと。
+            - pkg: github.com/golang/protobuf
+              desc: google.golang.org/protobuf を使うこと。
+
+    revive:
+      # revive の全ルールを有効化したうえで、問題のあるものだけ個別に調整。
+      enable-all-rules: true
+      rules:
+        # --- プロジェクト固有の引数が必要で、無いと no-op/エラーになるもの ---
+        - name: file-header
+          disabled: true
+        - name: banned-characters
+          disabled: true
+        # --- 専用リンターと重複し二重報告になるもの(シグナルを保つため無効化) ---
+        - name: cyclomatic # ↔ cyclop / gocyclo
+          disabled: true
+        - name: cognitive-complexity # ↔ gocognit
+          disabled: true
+        - name: line-length-limit # ↔ lll / golines
+          disabled: true
+        - name: function-length # ↔ funlen
+          disabled: true
+        - name: add-constant # ↔ mnd / goconst
+          disabled: true
+        - name: unhandled-error # ↔ errcheck
+          disabled: true
+        - name: max-public-structs
+          disabled: true
+        # --- 強い意見だが妥当な引数で残すもの ---
+        - name: argument-limit
+          arguments: [6]
+        - name: function-result-limit
+          arguments: [4]
+        - name: max-control-nesting
+          arguments: [4]
+
+  exclusions:
+    # 厳格化: 典型的な生成物パターンではなく、正規の「Code generated ... DO NOT EDIT.」を
+    # 持つファイルのみ除外する。プリセット除外は使用しない。
+    generated: strict
+
+issues:
+  # すべての指摘を表示(同一/リンター毎の上限を撤廃)。
+  max-same-issues: 0
+  max-issues-per-linter: 0
+
+formatters:
+  enable:
+    - gofumpt # gofmt のスーパーセット(より厳格な整形)
+    - gci # import の並び順・グループ化
+    - golines # 長い行の自動折り返し
+  settings:
+    gofumpt:
+      module-path: acmon
+      extra-rules: true
+    gci:
+      sections:
+        - standard # 標準ライブラリ
+        - default # サードパーティ
+        - prefix(acmon) # 自モジュール
+      custom-order: true
+    golines:
+      max-len: 120
+      tab-len: 4
+      shorten-comments: true
+      reformat-tags: true
