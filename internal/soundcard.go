@@ -23,7 +23,7 @@ var harmonicOrders = []int{3, 5, 7, 9, 11, 13, 15}
 const (
 	formatS16      = "S16_LE"     // 16bit リトルエンディアン PCM
 	minHistBlocks  = 8            // フリッカ評価に必要な最小ブロック数
-	fundLowHz      = 55.0         // 基本波探索帯の下限[Hz]
+	fundLowHz      = 45.0         // 基本波探索帯の下限[Hz]（50Hz/60Hz 両系統を覆う）
 	fundHighHz     = 65.0         // 基本波探索帯の上限[Hz]
 	noiseLowCutHz  = 10.0         // ノイズ床推定で除外する低域カットオフ[Hz]
 	dbfsRefScale   = 20.0         // 振幅→dBFS 変換係数 (20*log10)
@@ -165,7 +165,7 @@ func (s *SoundcardSampler) analyze(buf, win []float64, winSum float64, fft *four
 	amp := amplitudeSpectrum(buf, win, winSum, dc, fft)
 	fundBin := findFundamentalBin(amp, binHz)
 	f0 := float64(fundBin) * binHz
-	fundAmp := clusterAmp(amp, fundBin, 1)
+	fundAmp := clusterAmp(amp, fundBin)
 
 	harm := harmonicRatios(amp, f0, binHz, fundAmp)
 	thd := computeTHD(amp, f0, binHz, fundAmp)
@@ -262,7 +262,7 @@ func harmonicRatios(amp []float64, f0, binHz, fundAmp float64) map[int]float64 {
 		}
 
 		if fundAmp > 0 {
-			harm[ord] = clusterAmp(amp, b, 1) / fundAmp
+			harm[ord] = clusterAmp(amp, b) / fundAmp
 		}
 	}
 
@@ -281,7 +281,7 @@ func computeTHD(amp []float64, f0, binHz, fundAmp float64) float64 {
 			break
 		}
 
-		a := clusterAmp(amp, b, 1)
+		a := clusterAmp(amp, b)
 		hsq += a * a
 	}
 

@@ -41,6 +41,9 @@ linters:
     # 日本語のユーザ向けメッセージ(ログ等)を意図的に使うため、Han スクリプトの
     # 文字列リテラルを一律に問題視する gosmopolitan は本プロジェクトに不適合。
     - gosmopolitan
+    # DSP/ADC プロトコル等の検証対象は大半が非公開関数のため、ホワイトボックス
+    # (package acmon)でのテストが必須。外部テストパッケージを強制する testpackage は不適合。
+    - testpackage
 
   settings:
     errcheck:

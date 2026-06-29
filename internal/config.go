@@ -16,9 +16,7 @@ type Config struct {
 	SagVolts             float64
 	FFTSize              int
 	ZmptWindow           time.Duration
-	ADCBits              int
 	ZmptCalVoltsPerCount float64
-	NominalVolts         float64
 	ADCChannel           int
 	SwellVolts           float64
 	EventHystV           float64
@@ -51,7 +49,6 @@ func ParseFlags() *Config {
 		0.0,
 		"calibration: line volts per RMS ADC count (must be set, see README)",
 	)
-	flag.Float64Var(&c.NominalVolts, "nominal-volts", 100.0, "nominal line voltage [V]")
 	flag.Float64Var(&c.SagVolts, "sag-volts", 95.0, "sag threshold [V]")
 	flag.Float64Var(&c.SwellVolts, "swell-volts", 107.0, "swell threshold [V]")
 	flag.Float64Var(&c.EventHystV, "event-hyst", 1.0, "sag/swell recovery hysteresis [V]")
@@ -67,12 +64,10 @@ func ParseFlags() *Config {
 
 	flag.Float64Var(&c.PstGain, "pst-gain", 50.0, "scale factor for simplified flicker indicator")
 
-	//nolint:revive // deep-exit: ParseFlags は起動時に main から一度だけ呼ぶ設定集約関数であり flag.Parse をここで呼ぶのが妥当。
-	flag.Parse()
+	flag.Parse() //nolint:revive // deep-exit: 設定集約関数なので main 同様に flag.Parse をここで呼ぶ
 
 	c.ZmptWindow = time.Duration(*windowMs) * time.Millisecond
 	c.PstWindow = time.Duration(*pstMs) * time.Millisecond
-	c.ADCBits = 12
 
 	return c
 }

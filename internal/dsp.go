@@ -142,11 +142,11 @@ func spectrum(fft *fourier.FFT, windowed []float64, windowGain float64) []float6
 	return amp
 }
 
-// clusterAmp は中心 bin の周辺 ±span のパワーを合算した振幅を返す。
+// clusterAmp は中心 bin とその左右 ±1 bin のパワーを合算した振幅を返す。
 // Hann 窓のスペクトル漏れ（±1 bin への分散）をまとめて拾うため。
-func clusterAmp(amp []float64, center, span int) float64 {
-	lo := center - span
-	hi := center + span
+func clusterAmp(amp []float64, center int) float64 {
+	lo := center - 1
+	hi := center + 1
 
 	if lo < 0 {
 		lo = 0

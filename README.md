@@ -71,10 +71,10 @@ MCP3208（DIP-16）の結線:
 go mod tidy
 
 # Pi 4 / Pi 5（64bit OS）
-CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o acmon .
+CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o acmon ./cmd/acmon
 
 # Pi（32bit OS）/ Zero 2W（32bit）
-CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 go build -ldflags="-s -w" -o acmon .
+CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 go build -ldflags="-s -w" -o acmon ./cmd/acmon
 ```
 
 ランタイム依存: サウンドカード系統を使う場合 Pi 側に **alsa-utils**（`arecord`）が必要。
